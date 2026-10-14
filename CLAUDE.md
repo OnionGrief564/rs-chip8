@@ -1,0 +1,11 @@
+# Claude Code Agent Skills
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues using the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
