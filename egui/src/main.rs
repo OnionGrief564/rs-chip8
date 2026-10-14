@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 mod console_ui;
 mod egui;
 

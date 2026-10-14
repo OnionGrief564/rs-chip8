@@ -2,8 +2,12 @@ use std::{collections::HashSet, ops::Deref};
 
 use chip8::{Chip8, Display, FRAME_DURATION, SCREEN_HEIGHT, SCREEN_WIDTH};
 use egui::{epaint::RectShape, *};
+use windows_sys::Win32::Media::Audio;
+const BEEP_SOUND: &[u8; 63128] = include_bytes!("../beep.wav");
+
 pub struct App {
     chip: Chip8,
+    beeps: bool
 }
 
 impl crate::Ui for App {
@@ -11,7 +15,7 @@ impl crate::Ui for App {
         eframe::run_native(
             "Chip8",
             eframe::NativeOptions::default(),
-            Box::new(|_| Box::new(App { chip })),
+            Box::new(|_| Box::new(App { chip , beeps: false})),
         )
         .unwrap();
     }
@@ -23,12 +27,26 @@ impl eframe::App for App {
 
         self.chip.set_keypad(*keys);
 
-        let (display, _beep) = self.chip.run_frame().unwrap();
+        let (display, beep) = self.chip.run_frame().unwrap();
         egui::CentralPanel::default().show(ctx, |ui| {
             App::display_screen(ui, display);
         });
 
-        //TODO: Beep if needed
+        if beep.is_some() && !self.beeps {        
+            self.beeps = true;
+            unsafe {
+                let r = Audio::PlaySoundA(BEEP_SOUND.as_ptr(), -1, Audio::SND_MEMORY | Audio::SND_ASYNC | Audio::SND_LOOP);
+                if r == 0 {panic!("Could not beep!")};
+            }
+        } else if beep.is_none() && self.beeps {
+            self.beeps = false;
+            unsafe {
+                let r = Audio::PlaySoundA(std::ptr::null(), -1, 0);
+                if r == 0 {panic!("Could not beep!")};
+            }
+        }
+
+
 
         std::thread::sleep(FRAME_DURATION);
         ctx.request_repaint();
