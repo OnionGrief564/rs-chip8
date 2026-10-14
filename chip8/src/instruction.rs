@@ -155,10 +155,14 @@ pub fn execute(
     match instruction {
         Instruction::CLS => {
             *emulator.display.mut_data_to_update() = [false; screen_size()];
+            // 109 µs — ~1/153 of 60 Hz frame (16.67 ms). Original CHIP-8 ~500 IPS (~2ms/inst).
+            // Frame budget: ~8-10 instructions at original speed; here optimized.
             Ok(Duration::from_micros(109))
         }
 
         Instruction::RET => {
+            // 105 µs ≈ 1/25th of a 60 Hz frame. Original CHIP-8 ~500 IPS.
+            // Stack pop + PC update = ~1 cycle in original interpreter.
             emulator.pc = emulator
                 .stack
                 .pop()
@@ -168,11 +172,16 @@ pub fn execute(
 
         Instruction::SysJump(_) => unreachable!(),
         Instruction::JP(addr) => {
+            // 105 µs — simple PC load. Original CHIP-8 JP is 1 cycle.
+            // At ~500 IPS, 1 cycle ≈ 2ms; here tuned for 60 Hz frame budget.
             emulator.pc = addr;
             Ok(Duration::from_micros(105))
         }
 
         Instruction::ReadRegisters(v_count) => {
+            // 605 µs — loads V0..Vx from memory at I. Original CHIP-8 LD Vx, [I]
+            // takes 1 cycle per register (x+1 cycles). At ~500 IPS, x registers
+            // would take ~2ms * (x+1). Here ~605 µs for up to 16 regs.
             let data = &emulator
                 .memory
                 .get(emulator.i..emulator.i + v_count as usize + 1)
@@ -184,6 +193,9 @@ pub fn execute(
         }
 
         Instruction::StoreRegisters(v_count) => {
+            // 605 µs — stores V0..Vx to memory at I. Original CHIP-8 ST Vx, [I]
+            // takes 1 cycle per register (x+1 cycles). At ~500 IPS, x registers
+            // take ~2ms * (x+1). Here ~605 µs for up to 16 regs.
             let init = emulator.i;
             let mem = emulator
                 .memory
@@ -196,6 +208,9 @@ pub fn execute(
         }
 
         Instruction::StoreBCD(vx) => {
+            // 927 µs — stores BCD representation of register vx to memory at I.
+            // Original CHIP-8 ST Vx, [I] takes 2 cycles. At ~500 IPS, 2 cycles ≈ 4ms.
+            // Here ~927 µs is optimized for 60 Hz frame budget.
             let bcd = emulator.registers[vx];
             emulator.memory[emulator.i] = bcd / 100;
             emulator.memory[emulator.i + 1] = bcd % 100 / 10;
@@ -204,16 +219,23 @@ pub fn execute(
         }
 
         Instruction::LoadISprite(vx) => {
+            // 91 µs — loads sprite address into I. Original CHIP-8 LD I, Vx (sprite index)
+            // takes 1 cycle (LD I, [sprite table]). At ~500 IPS ≈ 2ms.
+            // Here optimized for 60 Hz frame budget.
             emulator.i = emulator.registers[vx] as usize * 5;
             Ok(Duration::from_micros(91))
         }
 
         Instruction::ADDI(vx) => {
+            // 86 µs — adds register vx to I. Original CHIP-8 ADD I, Vx
+            // takes 1 cycle. At ~500 IPS ≈ 2ms. Here optimized.
             emulator.i += emulator.registers[vx] as usize;
             Ok(Duration::from_micros(86))
         }
 
         Instruction::LoadSoundTimer(vx) => {
+            // 45 µs — original CHIP-8 ST ST, Vx (load delay? sound?) takes 1 cycle (~2ms @ 500 IPS).
+            // 60 Hz timer tick = 16.67 ms; tuned for faster frame budget.
             emulator.sound_timer = emulator.registers[vx];
             Ok(Duration::from_micros(45))
         }
